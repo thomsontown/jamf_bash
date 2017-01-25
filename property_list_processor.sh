@@ -170,7 +170,7 @@ for (( INDEX=1; INDEX<=$COUNT; INDEX++ )); do
 done
 
 
-#   kill caching of plist entries to
+#	kill caching of plist entries to
 #	force reading of updated settings
 /usr/bin/killall cfprefsd
 
