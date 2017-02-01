@@ -77,7 +77,6 @@ for INDEX in ${!PREFERENCES[@]}; do
 
 		#	write preferences to local user profile 
 		if /usr/bin/sudo -u $LOCAL_USER /usr/bin/defaults write "${USER_HOME%/}$DEFAULT_LIBRARY_PATH" $KEY -${TYPE} $VALUE 2> /dev/null; then
-		
 			echo "Updated user profile [$LOCAL_USER] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
 		else
 			echo "ERROR: Unable to write key [$KEY] to user profile [$LOCAL_USER]."
