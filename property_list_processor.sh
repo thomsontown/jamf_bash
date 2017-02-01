@@ -139,9 +139,12 @@ for (( INDEX=1; INDEX<=$COUNT; INDEX++ )); do
 				if [ ! -d "${USER_HOME%/}/Library/Preferences" ]; then continue; fi
 
 				#	write preferences to local user profile 
-				if /usr/bin/sudo -u $LOCAL_USER /usr/bin/defaults write "${USER_HOME%/}/Library/Preferences/$DOMAIN" $KEY -${TYPE} $VALUE 2> /dev/null; then
-				
+				if /usr/bin/defaults write "${USER_HOME%/}/Library/Preferences/$DOMAIN" $KEY -${TYPE} $VALUE 2> /dev/null; then
 					echo "Updated [${USER_HOME%/}/Library/Preferences/$DOMAIN with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
+
+					#	reset permissions after updating
+					/bin/chmod 0755  "${USER_HOME%/}/Library/Preferences/${DOMAIN}.plist"
+					/usr/sbin/chown $LOCAL_USER: "${USER_HOME%/}/Library/Preferences/${DOMAIN}.plist"			
 				else
 					echo "ERROR: Unable to write key [$KEY] to [${USER_HOME%/}/Library/Preferences/$DOMAIN]."
 				fi
