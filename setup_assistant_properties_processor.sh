@@ -30,7 +30,7 @@ OS_BUILD=`/usr/bin/defaults read "/System/Library/CoreServices/SystemVersion" Pr
 
 
 #	query direcotry for list of local users
-LOCAL_USERS=(`/usr/bin/dscl . list /Users UniqueID | awk '$2 > 500 {print $1}'`)
+LOCAL_USERS=(`/usr/bin/dscl . list /Users UniqueID | /usr/bin/awk '$2 > 500 {print $1}'`)
 
 
 #	verify run as root
@@ -70,7 +70,7 @@ for INDEX in ${!PREFERENCES[@]}; do
 	for LOCAL_USER in ${LOCAL_USERS[@]}; do
 
 		#	get home directory for local user 
-		USER_HOME=`/usr/bin/dscl  . read /Users/$LOCAL_USER NFSHomeDirectory | awk '{ print $2 }'`
+		USER_HOME=`/usr/bin/dscl  . read /Users/$LOCAL_USER NFSHomeDirectory | /usr/bin/awk '{ print $2 }'`
 
 		#	skip local user if no existing preferences are found 
 		if [ ! -d "${USER_HOME%/}/Library/Preferences" ]; then continue; fi
