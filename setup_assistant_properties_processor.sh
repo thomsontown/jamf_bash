@@ -15,10 +15,6 @@
 #    GitHub:            https://github.com/thomsontown
 
 
-#	set preferences array
-PREFERENCES=("DidSeeCloudSetup:bool:true" "DidSeeiCloudSecuritySetup:bool:true" "GestureMovieSeen:string:none" "LastCacheCleanupProductVersion:string:$OS_VERSION" "LastPreLoginTasksPerformedBuild:string:$OS_BUILD" "LastPreLoginTasksPerformedVersion:string:$OS_VERSION" "LastSeenCloudProductVersion:string:$OS_VERSION" "SkipFirstLoginOptimization:bool:true" "DidSeeSiriSetup:bool:true")
-
-
 #	set preferences paths
 SYSTEM_TEMPLATE_PATH="/System/Library/User Template/Non_localized/Library/Preferences/com.apple.SetupAssistant"
 DEFAULT_LIBRARY_PATH="/Library/Preferences/com.apple.SetupAssistant"
@@ -27,6 +23,10 @@ DEFAULT_LIBRARY_PATH="/Library/Preferences/com.apple.SetupAssistant"
 #	query os version and build number
 OS_VERSION=`/usr/bin/defaults read "/System/Library/CoreServices/SystemVersion" ProductVersion`
 OS_BUILD=`/usr/bin/defaults read "/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
+
+
+#	set preferences array
+PREFERENCES=("DidSeeCloudSetup:bool:true" "DidSeeiCloudSecuritySetup:bool:true" "GestureMovieSeen:string:none" "LastCacheCleanupProductVersion:string:$OS_VERSION" "LastPreLoginTasksPerformedBuild:string:$OS_BUILD" "LastPreLoginTasksPerformedVersion:string:$OS_VERSION" "LastSeenCloudProductVersion:string:$OS_VERSION" "SkipFirstLoginOptimization:bool:true" "DidSeeSiriSetup:bool:true")
 
 
 #	query direcotry for list of local users
@@ -41,7 +41,7 @@ fi
 
 
 #	verify template and system paths
-if [ ! -d "$SYSTEM_TEMPLATE_PATH" ] || [ ! -d "$DEFAULT_LIBRARY_PATH" ]; then
+if [ ! -d "${SYSTEM_TEMPLATE_PATH%/*}" ] || [ ! -d "${DEFAULT_LIBRARY_PATH%/*}" ]; then
 	echo "ERROR: Unable to find one or more paths."
 	exit $LINENO
 fi
@@ -60,7 +60,7 @@ for INDEX in ${!PREFERENCES[@]}; do
 	read KEY TYPE VALUE <<< ${PREFERENCE[@]}
 
 	#	write preferences to user templates 
-	if /usr/bin/defaults write "${SYSTEM_TEMPLATE_PATH}" $KEY -${TYPE} $VALUE 2> /dev/null; then
+	if /usr/bin/defaults write "${SYSTEM_TEMPLATE_PATH}" $KEY -${TYPE} $VALUE &> /dev/null; then
 		echo "Updated user template with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
 	else
 		echo "ERROR: Unable to write key [$KEY] to user template."
@@ -76,8 +76,12 @@ for INDEX in ${!PREFERENCES[@]}; do
 		if [ ! -d "${USER_HOME%/}/Library/Preferences" ]; then continue; fi
 
 		#	write preferences to local user profile 
-		if /usr/bin/sudo -u $LOCAL_USER /usr/bin/defaults write "${USER_HOME%/}$DEFAULT_LIBRARY_PATH" $KEY -${TYPE} $VALUE 2> /dev/null; then
+		if /usr/bin/defaults write "${USER_HOME%/}$DEFAULT_LIBRARY_PATH" $KEY -${TYPE} $VALUE &> /dev/null; then
 			echo "Updated user profile [$LOCAL_USER] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
+			
+			#	reset permissions after updating
+			/bin/chmod 0755 "${USER_HOME%/}${DEFAULT_LIBRARY_PATH}.plist"
+			/usr/sbin/chown $LOCAL_USER: "${USER_HOME%/}${DEFAULT_LIBRARY_PATH}.plist"
 		else
 			echo "ERROR: Unable to write key [$KEY] to user profile [$LOCAL_USER]."
 		fi
