@@ -17,8 +17,8 @@
 #    the name of the newly generated package file.
 
 #    Author: 	Andrew Thomson
-#    Date:		02-03-2017
-#    GitHub:     https://github.com/thomsontown
+#    Date:      02-03-2017
+#    GitHub:    https://github.com/thomsontown
 
 
 SOURCE=${1%/}                       #	application bundle path as command line argument
