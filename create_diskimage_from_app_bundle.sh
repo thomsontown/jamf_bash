@@ -1,24 +1,24 @@
 #!/bin/sh
 
 
-#	This script was written to quickly and easily create disk image files 
-#	containing simple application bundles that are typically downloaded 
-#	and manually moved into the /Applications folder for use. Using this 
-#	script, the application bundles will be added to a JAMF PRO compatible
-#   disk image file that can then be used for easy distribution. The scrip
-#   must run as root. You can include the path to the application bundle as 
-#	a parameter when running the sciprt, or when prompted, enter it manually 
-#	or drag and drop into the terminal window and press the ENTER key. 
+#    This script was written to quickly and easily create disk image files 
+#    containing simple application bundles that are typically downloaded 
+#    and manually moved into the /Applications folder for use. Using this 
+#    script, the application bundles will be added to a JAMF PRO compatible
+#    disk image file that can then be used for easy distribution. The scrip
+#    must run as root. You can include the path to the application bundle as 
+#    a parameter when running the sciprt, or when prompted, enter it manually 
+#    or drag and drop into the terminal window and press the ENTER key. 
 
-#   WARNING: The source location you direct the script to for the application
-#	bundle will also serve as the destination on target computers. 
+#    WARNING: The source location you direct the script to for the application
+#    bundle will also serve as the destination on target computers. 
 
-#	I've added variables for PREFIX and SUFFIX so as to be able to customize 
-#	the name of the newly generated package file.
+#    I've added variables for PREFIX and SUFFIX so as to be able to customize 
+#    the name of the newly generated package file.
 
-#	Author: 	Andrew Thomson
-#	Date:		02-03-2017
-#	GitHug:     https://github.com/thomsontown
+#    Author: 	Andrew Thomson
+#    Date:		02-03-2017
+#    GitHub:     https://github.com/thomsontown
 
 
 SOURCE=${1%/}                       #	application bundle path as command line argument
