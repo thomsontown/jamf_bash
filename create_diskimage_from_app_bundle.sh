@@ -76,28 +76,33 @@ if [[ ${SOURCE} != *"/Applications"* ]]; then
 fi
 
 
-if ! /usr/bin/rsync -axlR "${SOURCE%/}" "${TMP_SOURCE%/}"; then 
-	echo "ERROR: Unable to copy application bundle to temporary location."
-	exit $LINENO
-fi
-
-
 #	read info.plist to get source attributes
-if [ -f "${TMP_SOURCE%/}${SOURCE}/Contents/Info.plist" ]; then
+if [ -f "${SOURCE}/Contents/Info.plist" ]; then
 	
 	#	get app bundle name 
-	if ! NAME=`/usr/bin/defaults read "${TMP_SOURCE%/}${SOURCE%/}/Contents/Info" CFBundleName 2> /dev/null`; then 
+	if ! NAME=`/usr/bin/defaults read "${SOURCE%/}/Contents/Info" CFBundleName 2> /dev/null`; then 
 		
 		#	as alternate
 		NAME=`/usr/bin/basename -a .app "$SOURCE"`
 	fi	
 	
 	#	get app bundle version
-	if ! VERSION=`/usr/bin/defaults read "${TMP_SOURCE%/}${SOURCE%/}/Contents/Info" CFBundleShortVersionString 2> /dev/null`; then
+	if ! VERSION=`/usr/bin/defaults read "${SOURCE%/}/Contents/Info" CFBundleShortVersionString 2> /dev/null`; then
 
 		#	as alternate
-		VERSION=`/usr/bin/defaults read "${TMP_SOURCE%/}${SOURCE%/}/Contents/Info" CFBundleVersionString 2> /dev/null`
+		VERSION=`/usr/bin/defaults read "${SOURCE%/}/Contents/Info" CFBundleVersionString 2> /dev/null`
 	fi
+fi
+
+
+#	make temp folder
+TMP_SOURCE=`/usr/bin/mktemp -d "/tmp/$NAME.XXXX"`
+
+
+#	copy source to temp
+if ! /usr/bin/rsync -axlR "${SOURCE%/}" "${TMP_SOURCE%/}"; then 
+	echo "ERROR: Unable to copy application bundle to temporary location."
+	exit $LINENO
 fi
 
 
@@ -106,10 +111,6 @@ if [[ -z ${NAME} ]] || [[ -z ${VERSION} ]]; then
 	echo "ERROR: One or more attributes could not be found."
 	exit $LINENO
 fi
-
-
-#	make temp folder
-TMP_SOURCE=`/usr/bin/mktemp -d "/tmp/$NAME.XXXX"`
 
 
 #	display variables
