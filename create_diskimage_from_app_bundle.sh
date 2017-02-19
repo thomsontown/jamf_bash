@@ -83,7 +83,7 @@ if [ -f "${SOURCE}/Contents/Info.plist" ]; then
 	if ! NAME=`/usr/bin/defaults read "${SOURCE%/}/Contents/Info" CFBundleName 2> /dev/null`; then 
 		
 		#	as alternate
-		NAME=`/usr/bin/basename -a .app "$SOURCE"`
+		NAME=`/usr/bin/basename -s .app "$SOURCE"`
 	fi	
 	
 	#	get app bundle version
