@@ -15,75 +15,83 @@
 #    GitHub:            https://github.com/thomsontown
 
 
-#	set preferences paths
-SYSTEM_TEMPLATE_PATH="/System/Library/User Template/Non_localized/Library/Preferences/com.apple.SetupAssistant"
-DEFAULT_LIBRARY_PATH="/Library/Preferences/com.apple.SetupAssistant"
+
+#	if target not specified, then target is /
+TARGET=${3:-/}
 
 
-#	query os version and build number
-OS_VERSION=`/usr/bin/defaults read "/System/Library/CoreServices/SystemVersion" ProductVersion`
-OS_BUILD=`/usr/bin/defaults read "/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
+#	verify run as root
+if [[ $EUID -ne 0 ]]; then
+	(>&2 echo "ERROR: This script must run with root privileges.")
+	exit $LINENO
+fi
+
+
+#	get list of home directories from target
+HOME_DIRECTORIES=(`/usr/bin/dscl -f ${TARGET%/}/var/db/dslocal/nodes/Default localonly list /Local/Target/Users NFSHomeDirectory | /usr/bin/awk '{print $2}'`)
+
+
+#	eliminate home directories without existing preferences
+for INDEX in ${!HOME_DIRECTORIES[@]}; do
+	if [ ! -d "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences" ]; then
+		unset HOME_DIRECTORIES[$INDEX] 
+	fi
+done
+
+
+#	query os version 
+if ! OS_VERSION=`/usr/bin/defaults read "${TARGET%/}/System/Library/CoreServices/SystemVersion" ProductVersion 2> /dev/null`; then 
+	(>&2 echo "ERROR: Unable to determine OS Version.")
+	exit $LINENO
+fi 
+
+ 
+#	query build version
+if ! OS_BUILD=`/usr/bin/defaults read "${TARGET%/}/System/Library/CoreServices/SystemVersion" ProductBuildVersion 2> /dev/null`; then
+	(>&2 echo "ERROR: Unable to determine OS Build.")
+	exit $LINENO
+fi
 
 
 #	set preferences array
 PREFERENCES=("DidSeeCloudSetup:bool:true" "DidSeeiCloudSecuritySetup:bool:true" "GestureMovieSeen:string:none" "LastCacheCleanupProductVersion:string:$OS_VERSION" "LastPreLoginTasksPerformedBuild:string:$OS_BUILD" "LastPreLoginTasksPerformedVersion:string:$OS_VERSION" "LastSeenCloudProductVersion:string:$OS_VERSION" "SkipFirstLoginOptimization:bool:true" "DidSeeSiriSetup:bool:true")
 
 
-#	query direcotry for list of local users
-LOCAL_USERS=(`/usr/bin/dscl . list /Users UniqueID | /usr/bin/awk '$2 > 500 {print $1}'`)
-
-
-#	verify run as root
-if [[ $EUID -ne 0 ]]; then
-	echo "ERROR: This script must run with root privileges."
-	exit $LINENO
-fi
-
-
-#	verify template and system paths
-if [ ! -d "${SYSTEM_TEMPLATE_PATH%/*}" ] || [ ! -d "${DEFAULT_LIBRARY_PATH%/*}" ]; then
-	echo "ERROR: Unable to find one or more paths."
-	exit $LINENO
-fi
-
-
 #	enumerate pseudo multi-demensional array where each
 #	item contains a preference key, type and value
-for INDEX in ${!PREFERENCES[@]}; do
+for PREF_INDEX in ${!PREFERENCES[@]}; do
 
 	#	extract sub-array from each element
 	#	of the parent array
-	PREFERENCE=(${PREFERENCES[$INDEX]//:/ })
+	PREFERENCE=(${PREFERENCES[$PREF_INDEX]//:/ })
 
 	#	split each item of the sub-array
 	#	into individual variables
-	read KEY TYPE VALUE <<< ${PREFERENCE[@]}
+	IFS=" " read KEY TYPE VALUE <<< ${PREFERENCE[@]}
 
-	#	write preferences to user templates 
-	if /usr/bin/defaults write "${SYSTEM_TEMPLATE_PATH}" $KEY -${TYPE} $VALUE &> /dev/null; then
-		echo "Updated user template with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
-	else
-		echo "ERROR: Unable to write key [$KEY] to user template."
-	fi
+	#	enumerate preferences paths
+	for INDEX in ${!HOME_DIRECTORIES[@]}; do
 
-	#	write preferences to each user profile
-	for LOCAL_USER in ${LOCAL_USERS[@]}; do
+		#	get profile user
+		HOME_USER=`/usr/bin/stat -f %Su "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/."`
 
-		#	get home directory for local user 
-		USER_HOME=`/usr/bin/dscl  . read /Users/$LOCAL_USER NFSHomeDirectory | /usr/bin/awk '{ print $2 }'`
+		#	apply preference to profile
+		if /usr/bin/defaults write "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist" $KEY -${TYPE} $VALUE &> /dev/null; then
+			echo "Updated key [$KEY] to user profile [${HOME_DIRECTORIES[$INDEX]%}]."
 
-		#	skip local user if no existing preferences are found 
-		if [ ! -d "${USER_HOME%/}/Library/Preferences" ]; then continue; fi
-
-		#	write preferences to local user profile 
-		if /usr/bin/defaults write "${USER_HOME%/}$DEFAULT_LIBRARY_PATH" $KEY -${TYPE} $VALUE &> /dev/null; then
-			echo "Updated user profile [$LOCAL_USER] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
-			
 			#	reset permissions after updating
-			/bin/chmod 0755 "${USER_HOME%/}${DEFAULT_LIBRARY_PATH}.plist"
-			/usr/sbin/chown $LOCAL_USER: "${USER_HOME%/}${DEFAULT_LIBRARY_PATH}.plist"
+			/bin/chmod 0755 "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist"
+			/usr/sbin/chown $HOME_USER: "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist"
 		else
-			echo "ERROR: Unable to write key [$KEY] to user profile [$LOCAL_USER]."
+			(>&2 echo "ERROR: Unable to write key [$KEY] to user profile [${HOME_DIRECTORIES[$INDEX]%}].")
 		fi
 	done
+
+
+	#	apply preference to template
+	if /usr/bin/defaults write "${TARGET%/}/System/Library/User Template/Non_Localized/Library/Preferences/com.apple.SetupAssistant.plist" $KEY -${TYPE} $VALUE &> /dev/null; then
+		echo "Updated key [$KEY] to user template."
+	else
+		(>&2 echo "ERROR: Unable to write key [$KEY] to user template.")
+	fi
 done
