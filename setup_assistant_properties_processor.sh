@@ -73,7 +73,7 @@ for PREF_INDEX in ${!PREFERENCES[@]}; do
 	for INDEX in ${!HOME_DIRECTORIES[@]}; do
 
 		#	get profile user
-		HOME_USER=`/usr/bin/stat -f %Su "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/."`
+		OWNER=`/usr/bin/stat -f %u:%g "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/."`
 
 		#	apply preference to profile
 		if /usr/bin/defaults write "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist" $KEY -${TYPE} $VALUE &> /dev/null; then
@@ -81,7 +81,7 @@ for PREF_INDEX in ${!PREFERENCES[@]}; do
 
 			#	reset permissions after updating
 			/bin/chmod 0755 "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist"
-			/usr/sbin/chown $HOME_USER: "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist"
+			/usr/sbin/chown $OWNER "${TARGET%/}${HOME_DIRECTORIES[$INDEX]%/}/Library/Preferences/com.apple.SetupAssistant.plist"
 		else
 			(>&2 echo "ERROR: Unable to write key [$KEY] to user profile [${HOME_DIRECTORIES[$INDEX]%}].")
 		fi
