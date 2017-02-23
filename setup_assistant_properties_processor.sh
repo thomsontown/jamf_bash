@@ -28,7 +28,9 @@ fi
 
 
 #	get list of home directories from target
-HOME_DIRECTORIES=(`/usr/bin/dscl -f ${TARGET%/}/var/db/dslocal/nodes/Default localonly list /Local/Target/Users NFSHomeDirectory | /usr/bin/awk '{print $2}'`)
+for USER_PLIST in "${TARGET%/}"/var/db/dslocal/nodes/Default/users/*.plist; do
+	HOME_DIRECTORIES+=(`/usr/bin/defaults read "$USER_PLIST" home | /usr/bin/awk -F'"' '{getline;print $2;exit}' 2> /dev/null`)
+done
 
 
 #	eliminate home directories without existing preferences
