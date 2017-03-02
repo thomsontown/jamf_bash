@@ -54,14 +54,14 @@ done
 #	verify minimum os version
 OS_VERSION=`/usr/bin/sw_vers -productVersion`
 if [ "${OS_VERSION//.}" -lt "10100" ]; then
-	echo "ERROR: The OS verison does not meet the minimum requirements."
+	(>&2 echo "ERROR: The OS verison does not meet the minimum requirements.")
 	exit $LINENO
 fi
 
 
 #	check required parameters 
 if [ -z "$PICTURE_PATH" ] || [ ! -f "$PICTURE_PATH" ]; then
-	echo "ERROR: Image not found or not specified."
+	(>&2 echo "ERROR: Image not found or not specified.")
 	exit $LINENO
 fi
 
@@ -77,13 +77,13 @@ if [ -n "${TARGET%/}$LINK_PATH" ]; then
 	if [ -f "${TARGET%/}${LINK_PATH}" ] && [ "${TARGET%/}$LINK_PATH" != "$PICTURE_PATH" ]; then
 		
 		if ! /bin/mv "${TARGET%/}${LINK_PATH}" "${TARGET%/}${LINK_PATH}.$RANDOM"; then
-			echo "ERROR: Unable to rename linked image file."
+			(>&2 echo "ERROR: Unable to rename linked image file.")
 			exit $LINENO
 		fi
 		
 		#	copy new image to original linked file path
 		if ! /bin/cp -f "${PICTURE_PATH}" "${TARGET%/}${LINK_PATH}"; then
-			echo "ERROR: Unable to copy image to link path."
+			(>&2 echo "ERROR: Unable to copy image to link path.")
 			exit $LINENO
 		fi
 	fi
