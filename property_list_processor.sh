@@ -3,30 +3,18 @@
 
 #    This script started as a simple idea where I wanted to take away
 #    much of the scripting needed to set preferences in property list
-#    files and move the various settings into an xml file. This would
-#    allow those without scripting ability to modify and update which
-#    settings to modify. 
+#    files. To do this, I moved the various settings into xml format 
+#    and included them as payload at the tail end of the script. I thought 
+#    doing so would be more efficient and allow non-scripters the ability
+#    to modify preferences without having to alter any bash syntax. 
 
-#    My goal was to use this script to customize newly enrolled machines
-#    so that we can start using the Device Enrollment Program and still
-#    standardize on specific settings. But having a separate xml file
-#    to reference prevented us from adding it as a script to JAMF PRO. 
-
-#    So I decided I would simply include the xml as payload to the script.
-#    With the results directed to stdout, JAMF PRO will automatically 
-#    capture the successes or failures in its policy logs.  
-
-#    All xml elements and values are case specific. Follow the structure
-#    included below when specifying your desired plist settings.
-
-#    Use at your own risk. 
+#    For maximum flexiblity, I added the TARGET parameter so the 
+#    script could be used from within a package file to affect non-booted
+#    volumes during the imaging or upgrade process.
 
 #    Author:        Andrew Thomson
 #    Date:          12-15-2016
 
-
-#	set if the system should reboot after running script
-REBOOT=false
 
 
 #	for maximum flexibility, preferences can be
@@ -38,13 +26,38 @@ FEU=true    #	fill existing user profiles
 FDL=true    #	fill default library 
 
 
+#	set if the system should reboot after running script
+REBOOT=false
+
+
+#	if target not specified, then target is /
+TARGET=${3:-/}
+
+
 #	set preferences paths
-SYSTEM_TEMPLATE_PATH="/System/Library/User Template/Non_localized/Library/Preferences/"
-DEFAULT_LIBRARY_PATH="/Library/Preferences/"
+SYSTEM_TEMPLATE_PATH="${TARGET%/}/System/Library/User Template/Non_localized/Library/Preferences/"
+DEFAULT_LIBRARY_PATH="${TARGET%/}/Library/Preferences/"
 
 
-#	query direcotry for list of local users
-LOCAL_USERS=(`/usr/bin/dscl . list /Users UniqueID | awk '$2 > 500 {print $1}'`)
+#	verify run as root
+if [[ $EUID -ne 0 ]]; then
+	(>&2 echo "ERROR: This script must run with root privileges.")
+	exit $LINENO
+fi
+
+
+#	get list of home directories from target
+for USER_PLIST in "${TARGET%/}"/var/db/dslocal/nodes/Default/users/*.plist; do
+	HOME_DIRECTORIES+=(`/usr/bin/defaults read "$USER_PLIST" home | /usr/bin/awk -F'"' '{getline;print $2;exit}' 2> /dev/null`)
+done
+
+
+#	eliminate home directories without existing preferences
+for HOME_INDEX in ${!HOME_DIRECTORIES[@]}; do
+	if [ ! -d "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences" ]; then
+		unset HOME_DIRECTORIES[$HOME_INDEX] 
+	fi
+done
 
 
 #	read xml payload into variable. the xml payload
@@ -61,16 +74,9 @@ function queryPreference() {
 }
 
 
-#	verify run as root
-if [[ $EUID -ne 0 ]]; then
-	echo "ERROR: This script must run with root privileges."
-	exit $LINENO
-fi
-
-
 #	verify template and system paths
 if [ ! -d "$SYSTEM_TEMPLATE_PATH" ] || [ ! -d "$DEFAULT_LIBRARY_PATH" ]; then
-	echo "ERROR: Unable to find one or more paths."
+	(>&2 echo "ERROR: Unable to find one or more paths.")
 	exit $LINENO
 fi
 
@@ -78,7 +84,7 @@ fi
 #	use built-in xml command line tool to verify the 
 #	xml syntax and formatting
 if ! echo $XML_DATA | /usr/bin/xmllint --format - &> /dev/null; then
-	echo "ERROR: Invalid XML data. Please verify syntax."
+	(>&2 echo "ERROR: Invalid XML data. Please verify syntax.")
 	exit $LINENO
 fi
 
@@ -89,24 +95,25 @@ COUNT=`echo $XML_DATA | /usr/bin/xpath "count(//preference)" 2> /dev/null`;
 
 #	verify preferences are found
 if [ -z $COUNT ]; then
-	echo "ERROR: No perferences found."
+	(>&2 echo "ERROR: No perferences found.")
 	exit $LINENO
 fi
 
 
 #	display debug information
 if $DEBUG; then echo "PROPERTIES:$COUNT"; fi
+if $DEBUG; then echo "PROFILES:${#HOME_DIRECTORIES[@]}"; fi
 
 
 #	eunmerate each preference node within the xml
-for (( INDEX=1; INDEX<=$COUNT; INDEX++ )); do
+for (( PREF_INDEX=1; PREF_INDEX<=$COUNT; PREF_INDEX++ )); do
 
 	#	parse required xml tag values
-	CLASS=`queryPreference "$INDEX" "class"` 
-	DOMAIN=`queryPreference "$INDEX" "domain"`
-	KEY=`queryPreference "$INDEX" "key"`
-	TYPE=`queryPreference "$INDEX" "type"`
-	VALUE=`queryPreference "$INDEX" "value"`
+	CLASS=`queryPreference "$PREF_INDEX" "class"` 
+	DOMAIN=`queryPreference "$PREF_INDEX" "domain"`
+	KEY=`queryPreference "$PREF_INDEX" "key"`
+	TYPE=`queryPreference "$PREF_INDEX" "type"`
+	VALUE=`queryPreference "$PREF_INDEX" "value"`
 
 	#	process each preference for class of "user"	
 	if [ "$CLASS" == "user" ]; then
@@ -121,7 +128,7 @@ for (( INDEX=1; INDEX<=$COUNT; INDEX++ )); do
 				echo "Updated [${SYSTEM_TEMPLATE_PATH%/}/$DOMAIN] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
 			else
 
-				echo "ERROR: Unable to write key [$KEY] to [${SYSTEM_TEMPLATE_PATH%/}/$DOMAIN]."
+				(>&2 echo "ERROR: Unable to write key [$KEY] to [${SYSTEM_TEMPLATE_PATH%/}/$DOMAIN].")
 			fi
 		fi
 
@@ -130,23 +137,20 @@ for (( INDEX=1; INDEX<=$COUNT; INDEX++ )); do
 		#	setting is enabled
 		if $FEU; then
 			#	enumerate local users
-			for LOCAL_USER in ${LOCAL_USERS[@]}; do
+			for HOME_INDEX in ${!HOME_DIRECTORIES[@]}; do
 
-				#	get home directory for local user 
-				USER_HOME=`/usr/bin/dscl  . read /Users/$LOCAL_USER NFSHomeDirectory | awk '{ print $2 }'`
-
-				#	skip local user if no existing preferences are found 
-				if [ ! -d "${USER_HOME%/}/Library/Preferences" ]; then continue; fi
+				#	get profile user
+				OWNER=`/usr/bin/stat -f %u:%g "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/."`
 
 				#	write preferences to local user profile 
-				if /usr/bin/defaults write "${USER_HOME%/}/Library/Preferences/$DOMAIN" $KEY -${TYPE} $VALUE 2> /dev/null; then
-					echo "Updated [${USER_HOME%/}/Library/Preferences/$DOMAIN with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
+				if /usr/bin/defaults write "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/$DOMAIN" $KEY -${TYPE} $VALUE 2> /dev/null; then
+					echo "Updated [${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/$DOMAIN] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
 
 					#	reset permissions after updating
-					/bin/chmod 0755  "${USER_HOME%/}/Library/Preferences/${DOMAIN}.plist"
-					/usr/sbin/chown $LOCAL_USER: "${USER_HOME%/}/Library/Preferences/${DOMAIN}.plist"			
+					/bin/chmod 0755  "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/${DOMAIN}.plist" 2> /dev/null
+					/usr/sbin/chown $OWNER "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/${DOMAIN}.plist"	2> /dev/null		
 				else
-					echo "ERROR: Unable to write key [$KEY] to [${USER_HOME%/}/Library/Preferences/$DOMAIN]."
+					(>&2 echo "ERROR: Unable to write key [$KEY] to [${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/$DOMAIN].")
 				fi
 			done
 		fi
@@ -165,11 +169,14 @@ for (( INDEX=1; INDEX<=$COUNT; INDEX++ )); do
 				echo "Updated [${DEFAULT_LIBRARY_PATH%/}/$DOMAIN] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
 			else
 
-				echo "ERROR: Unable to write key [$KEY] to [${DEFAULT_LIBRARY_PATH%/}/$DOMAIN]."
+				(>&2 echo "ERROR: Unable to write key [$KEY] to [${DEFAULT_LIBRARY_PATH%/}/$DOMAIN].")
 			fi
 		fi
 
 	fi 
+
+	#	add a blank line for each preference
+	if $DEBUG && [ "$CLASS" == "user" ]; then echo -e "\r"; fi
 done
 
 
@@ -321,94 +328,6 @@ __XML_FOLLOWS__
 	</preference>	
 	<preference>
 		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeApplePaySetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: ApplePay</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeAvatarSetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: Avatar</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeCloudSetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: iCloud</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeSiriSetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: Siri</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeSyncSetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: Sync</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeSyncSetup2</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: Setup2</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeTouchIDSetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: TouchID</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeiCloudLoginForStorageServices</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: Storage</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>DidSeeiCloudSecuritySetup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: Security</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>GestureMovieSeen</key>
-		<type>string</type>
-		<value>none</value>
-		<note>Setup Supress: Gestures</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.SetupAssistant</domain>
-		<key>SkipFirstLoginOptimization</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Setup Supress: iCloud Version</note>
-	</preference>
-	<preference>
-		<class>user</class>
 		<domain>com.apple.TimeMachine</domain>
 		<key>DoNotOfferNewDisksForBackup</key>
 		<type>bool</type>
@@ -450,7 +369,7 @@ __XML_FOLLOWS__
 	<preference>
 		<class>user</class>
 		<domain>com.apple.Safari</domain>
-		<key>ShowFullURLInS</key>
+		<key>ShowFullURLInSmartSearchField</key>
 		<type>bool</type>
 		<value>true</value>
 		<note>Safari: ShowFullURL</note>
@@ -463,6 +382,14 @@ __XML_FOLLOWS__
 		<value>true</value>
 		<note>Safari: StatusBar</note>
 	</preference>
+	<preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>NewTabBehavior</key>
+		<type>int</type>
+		<value>1</value>
+		<note>Safari: OpenBlank</note>
+	</preference>	
 	<preference>
 		<class>user</class>
 		<domain>com.apple.Safari</domain>
@@ -516,8 +443,8 @@ __XML_FOLLOWS__
 		<domain>com.apple.AppleMultitouchTrackpad</domain>
 		<key>TrackpadScroll</key>
 		<type>bool</type>
-		<value>false</value>
-		<note>Trackpad: ReverseScroll</note>
+		<value>true</value>
+		<note>Trackpad: TwoFingerScroll</note>
 	</preference>
 	<preference>
 		<class>user</class>
@@ -548,8 +475,8 @@ __XML_FOLLOWS__
 		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
 		<key>TrackpadScroll</key>
 		<type>bool</type>
-		<value>false</value>
-		<note>BTTrackpad: ReverseScroll</note>
+		<value>true</value>
+		<note>BTTrackpad: TwoFingerScroll</note>
 	</preference>
 	<preference>
 		<class>user</class>
@@ -569,6 +496,14 @@ __XML_FOLLOWS__
 	</preference>
 	<preference>
 		<class>user</class>
+		<domain>com.apple.CrashReporter</domain>
+		<key>DialogType</key>
+		<type>string</type>
+		<value>none</value>
+		<note>CrashReport: DontWriteCrashReports</note>
+	</preference>
+	<preference>
+		<class>user</class>
 		<domain>.GlobalPreferences</domain>
 		<key>NSQuitAlwaysKeepsWindows</key>
 		<type>bool</type>
@@ -577,13 +512,20 @@ __XML_FOLLOWS__
 	</preference>
 	<preference>
 		<class>user</class>
-		<domain>com.apple.CrashReporter</domain>
-		<key>DialogType</key>
+		<domain>.GlobalPreferences</domain>
+		<key>AppleActionOnDoubleClick</key>
 		<type>string</type>
-		<value>none</value>
-		<note>CrashReport: DontWriteCrashReports</note>
+		<value>Maximize</value>
+		<note>AppWindow: MaximizeOnBannerDoubleClick</note>
 	</preference>
-
+	<preference>
+		<class>user</class>
+		<domain>.GlobalPreferences</domain>
+		<key>AppleMiniaturizeOnDoubleClick</key>
+		<type>bool</type>
+		<value>false</value>
+		<note>AppWindow: DontConflictWithAbove</note>
+	</preference>
 
 	<!--    start system class preferences    --> 
 
