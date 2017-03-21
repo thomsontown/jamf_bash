@@ -14,6 +14,7 @@
 
 #    Author:        Andrew Thomson
 #    Date:          12-15-2016
+#    GitHub:        https://github.com/thomsontown
 
 
 
@@ -182,7 +183,7 @@ done
 
 #	kill caching of plist entries to
 #	force reading of updated settings
-/usr/bin/killall cfprefsd
+if [ -x /usr/bin/killall ]; then /usr/bin/killall cfprefsd; fi
 
 
 #	depending on the properties you specified, it
