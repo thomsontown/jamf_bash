@@ -107,5 +107,31 @@ for INDEX in ${!HOME_DIRECTORIES[@]}; do
 done
 
 
-#	refresh desktop
-/usr/bin/killall Dock
+#	replace desktop picture cache for login window
+if [ -f "${TARGET%/}/Library/Caches/com.apple.desktop.admin.png" ]; then /bin/rm -f "${TARGET%/}/Library/Caches/com.apple.desktop.admin.png"; fi
+
+if ! /usr/bin/sips -s format png "$PICTURE_PATH" --out "${TARGET%/}/Library/Caches/com.apple.desktop.admin.png" &> /dev/null; then 
+	(>&2 /bin/echo "ERROR: Unable to reformat speficied desktop image.")
+else
+	/usr/sbin/chown root:wheel "${TARGET%/}/Library/Caches/com.apple.desktop.admin.png" &> /dev/null
+	/bin/chmod 755 "${TARGET%/}/Library/Caches/com.apple.desktop.admin.png" &> /dev/null
+	/usr/bin/chflags uchg "${TARGET%/}/Library/Caches/com.apple.desktop.admin.png" &> /dev/null
+fi
+
+
+#	remove desktop picture caches for user profiles (not using desktoppicture.db)
+PICTURE_CACHES=(`/usr/bin/find ${TARGET%/}/var/folders -type d -name com.apple.desktoppicture`)
+for PICTURE_CACHE in ${PICTURE_CACHES[@]}; do
+	if ! /bin/rm -rf "$PICTURE_CACHE"; then
+		(>&2 echo "ERROR: Unable to remove cached desktop picture.")
+	fi
+done
+
+
+#	rebuild cache
+/usr/bin/touch "${TARGET%/}/System/Library/Caches/com.apple.corestorage/EFILoginLocalizations"
+/usr/sbin/kextcache -fu ${TARGET}
+
+
+#	refresh dock
+if /usr/bin/pgrep Dock &> /dev/null; then /usr/bin/pkill Dock; fi
