@@ -181,11 +181,6 @@ for (( PREF_INDEX=1; PREF_INDEX<=$COUNT; PREF_INDEX++ )); do
 done
 
 
-#	kill caching of plist entries to
-#	force reading of updated settings
-if [ -x /usr/bin/killall ]; then /usr/bin/killall cfprefsd; fi
-
-
 #	depending on the properties you specified, it
 #	may be wise to prompt for a reboot. Otherwise
 #	only Finder and Dock may need a restart.
@@ -193,13 +188,14 @@ if $REBOOT; then
 	/usr/bin/osascript -e 'display dialog "This system has been updated and requires a reboot. You have 60 seconds to save your work." with title "Property List Processor" buttons {"Reboot"} default button "Reboot" giving up after 60'
 	/sbin/reboot
 else 
-	if echo $XML_DATA | /usr/bin/grep -i "com.apple.finder" &> /dev/null; then /usr/bin/killall Finder; fi
-	if echo $XML_DATA | /usr/bin/grep -i "com.apple.dock" &> /dev/null; then /usr/bin/killall Dock; fi
+	if /usr/bin/pgrep cfprefsd; then /usrbin/pkill cfprefsd; fi
+	if echo $XML_DATA | /usr/bin/grep -i "com.apple.finder" &> /dev/null && /usr/bin/pgrep Finder; then /usr/bin/pkill Finder; fi
+	if echo $XML_DATA | /usr/bin/grep -i "com.apple.dock" &> /dev/null&& /usr/bin/pgrep Dock; then /usr/bin/pkill Dock; fi
 fi
 
 
 #	exit script with return code
-exit $? 
+exit $0 
 
 
 #	the xml payload that follows can be modified to suit
