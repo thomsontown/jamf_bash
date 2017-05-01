@@ -152,5 +152,6 @@ for SYSTEM_PREF_INDEX in ${!SYSTEM_PREFERENCES[@]}; do
 	fi
 done
 
+if /usr/bin/pgrep cfprefsd; then /usrbin/pkill cfprefsd; fi
 if echo ${USER_PREFERENCES[@]} | /usr/bin/grep -i "com.apple.dock" &> /dev/null && /usr/bin/pgrep Dock &> /dev/null; then /usr/bin/pkill Dock; fi
 if echo ${USER_PREFERENCES[@]} | /usr/bin/grep -i "com.apple.finder" &> /dev/null && /usr/bin/pgrep Finder &> /dev/null; then /usr/bin/pkill Finder; fi	
