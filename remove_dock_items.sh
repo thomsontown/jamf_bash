@@ -63,4 +63,4 @@ done
 
 
 #	restart dock
-if $RESTART && [ "$TARGET" == "/" ]; then /usr/bin/killall Dock; fi 
+if /usr/bin/pgrep Dock &> /dev/null; then /usr/bin/pkill Dock; fi
