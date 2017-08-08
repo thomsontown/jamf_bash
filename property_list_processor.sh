@@ -174,7 +174,33 @@ for (( PREF_INDEX=1; PREF_INDEX<=$COUNT; PREF_INDEX++ )); do
 			fi
 		fi
 
+	elif [ "$CLASS" == "byhost" ]; then
+
+		#	only write preferences to existing user 
+		#	profiles if the fill-existing-user 
+		#	setting is enabled
+		if $FEU; then
+			#	enumerate local users
+			for HOME_INDEX in ${!HOME_DIRECTORIES[@]}; do
+
+				#	get profile user
+				OWNER=`/usr/bin/stat -f %u:%g "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/ByHost."`
+
+				#	write preferences to local user profile 
+				if /usr/bin/defaults -currentHost write "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/$DOMAIN" $KEY -${TYPE} $VALUE 2> /dev/null; then
+					echo "Updated [${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/ByHost/$DOMAIN] with KEY: $KEY TYPE: $TYPE VALUE: $VALUE."
+
+					#	reset permissions after updating
+					/bin/chmod 0755  "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/ByHost/${DOMAIN}.plist" 2> /dev/null
+					/usr/sbin/chown $OWNER "${TARGET%/}${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/ByHost/${DOMAIN}.plist"	2> /dev/null		
+				else
+					(>&2 echo "ERROR: Unable to write key [$KEY] to [${HOME_DIRECTORIES[$HOME_INDEX]%/}/Library/Preferences/ByHost/$DOMAIN].")
+				fi
+			done
+		fi
+
 	fi 
+
 
 	#	add a blank line for each preference
 	if $DEBUG && [ "$CLASS" == "user" ]; then echo -e "\r"; fi
@@ -188,14 +214,14 @@ if $REBOOT; then
 	/usr/bin/osascript -e 'display dialog "This system has been updated and requires a reboot. You have 60 seconds to save your work." with title "Property List Processor" buttons {"Reboot"} default button "Reboot" giving up after 60'
 	/sbin/reboot
 else 
-	if /usr/bin/pgrep cfprefsd; then /usrbin/pkill cfprefsd; fi
+	if /usr/bin/pgrep cfprefsd; then /usr/bin/pkill cfprefsd; fi
 	if echo $XML_DATA | /usr/bin/grep -i "com.apple.finder" &> /dev/null && /usr/bin/pgrep Finder; then /usr/bin/pkill Finder; fi
 	if echo $XML_DATA | /usr/bin/grep -i "com.apple.dock" &> /dev/null&& /usr/bin/pgrep Dock; then /usr/bin/pkill Dock; fi
 fi
 
 
 #	exit script with return code
-exit $0 
+exit 0 
 
 
 #	the xml payload that follows can be modified to suit
@@ -213,382 +239,347 @@ __XML_FOLLOWS__
 <preferences>
 	<preference>
 		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>_FXShowPosixPathInTitle</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Finder: PathInTitle</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>_FXSortFoldersFirst</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Finder: FoldersOnTop</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>FXDefaultSearchScope</key>
-		<type>string</type>
-		<value>SCcf</value>
-		<note>Finder: SearchCurrentFolder</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>ShowPathBar</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Finder: ShowPathBar</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>ShowStatusBar</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Finder: ShowStatusBar</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>NewWindowTarget</key>
-		<type>string</type>
-		<value>PfHm</value>
-		<note>Finder: WindowOpensHomeFolder</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.finder</domain>
-		<key>FXPreferredViewStyle</key>
-		<type>string</type>
-		<value>Nlsv</value>
-		<note>Finder: WindowListView</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.dock</domain>
-		<key>minimize-to-application</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Dock: MinimizeToAppIcon</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.dock</domain>
-		<key>wvous-br-corner</key>
-		<type>int</type>
-		<value>6</value>
-		<note>Dock: BottomRightBlockScreenSaver</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.dock</domain>
-		<key>wvous-br-modifier</key>
-		<type>int</type>
-		<value>0</value>
-		<note>Dock: BottomRightBlockScreenSaver</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.dock</domain>
-		<key>wvous-bl-corner</key>
-		<type>int</type>
-		<value>5</value>
-		<note>Dock: BottomLeftStartScreenSaver</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.dock</domain>
-		<key>wvous-bl-modifier</key>
-		<type>int</type>
-		<value>0</value>
-		<note>Dock: BottomLeftStartScreenSaver</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.desktopservices</domain>
-		<key>DSDontWriteNetworkStores</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Desktop: DontSaveAttributesNet</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.desktopservices</domain>
-		<key>DSDontWriteUSBStores</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Desktop: DontSaveAttributesUSB</note>
-	</preference>	
-	<preference>
-		<class>user</class>
-		<domain>com.apple.TimeMachine</domain>
-		<key>DoNotOfferNewDisksForBackup</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>TimeMachine: NewDisks</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.loginwindow</domain>
-		<key>SHOWFULLNAME</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>LoginWindow: FullName</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.loginwindow</domain>
-		<key>AdminHostInfo</key>
-		<type>string</type>
-		<value>DSStatus</value>
-		<note>LoginWindow: DSStatus</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.loginwindow</domain>
-		<key>LoginwindowLaunchesRelaunchApps</key>
-		<type>bool</type>
-		<value>false</value>
-		<note>LoginWindow: RelaunchApps</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.loginwindow</domain>
-		<key>TALLogoutSavesState</key>
-		<type>bool</type>
-		<value>false</value>
-		<note>LoginWindow: SavesState</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>ShowFullURLInSmartSearchField</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Safari: ShowFullURL</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>ShowStatusBar</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Safari: StatusBar</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>NewTabBehavior</key>
-		<type>int</type>
-		<value>1</value>
-		<note>Safari: OpenBlank</note>
-	</preference>	
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>NewWindowBehavior</key>
-		<type>int</type>
-		<value>1</value>
-		<note>Safari: OpenBlank</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>TabbedBrowsing</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Safari: EnableTabs</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>OpenExternalLinksInExistingWindow</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Safari: OpenInTabs</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.Safari</domain>
-		<key>OpenNewTabsInFront</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Safari: NewTabInFront</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleMultitouchTrackpad</domain>
-		<key>Clicking</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Trackpad: TapToClick</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleMultitouchTrackpad</domain>
-		<key>TrackpadRightClick</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Trackpad: RightClick</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleMultitouchTrackpad</domain>
-		<key>TrackpadScroll</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Trackpad: TwoFingerScroll</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleMultitouchTrackpad</domain>
-		<key>HIDScrollZoomModifierMask</key>
-		<type>int</type>
-		<value>262144</value>
-		<note>Trackpad: Zoom</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>Clicking</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>BTTrackpad: TapToClick</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>TrackpadRightClick</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>BTTrackpad: RightClick</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>TrackpadScroll</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>BTTrackpad: TwoFingerScroll</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>HIDScrollZoomModifierMask</key>
-		<type>int</type>
-		<value>262144</value>
-		<note>BTTrackpad: Zoom</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.universalaccess</domain>
-		<key>closeViewScrollWheelToggle</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>UnvAccess: ScrollZoom</note>
-	</preference>
-	<preference>
-		<class>user</class>
-		<domain>com.apple.CrashReporter</domain>
-		<key>DialogType</key>
-		<type>string</type>
-		<value>none</value>
-		<note>CrashReport: DontWriteCrashReports</note>
-	</preference>
-	<preference>
-		<class>user</class>
 		<domain>.GlobalPreferences</domain>
 		<key>NSQuitAlwaysKeepsWindows</key>
 		<type>bool</type>
 		<value>false</value>
-		<note>GlobDom: DontKeepWindows</note>
+		<comment>Disable saving application states.</comment>
 	</preference>
-	<preference>
+    <preference>
 		<class>user</class>
 		<domain>.GlobalPreferences</domain>
 		<key>AppleActionOnDoubleClick</key>
 		<type>string</type>
 		<value>Maximize</value>
-		<note>AppWindow: MaximizeOnBannerDoubleClick</note>
+		<comment>Set action when double-clicking on a window title-bar.</comment>
 	</preference>
 	<preference>
 		<class>user</class>
 		<domain>.GlobalPreferences</domain>
-		<key>AppleMiniaturizeOnDoubleClick</key>
+		<key>com.apple.trackpad.forceClick</key>
 		<type>bool</type>
 		<value>false</value>
-		<note>AppWindow: DontConflictWithAbove</note>
+		<comment></comment>
 	</preference>
+   <preference>
+		<class>user</class>
+		<domain>.GlobalPreferences</domain>
+		<key>com.apple.swipescrolldirection</key>
+		<type>bool</type>
+		<value>false</value>
+		<comment></comment>
+	</preference>
+   <preference>
+		<class>user</class>
+		<domain>.GlobalPreferences</domain>
+		<key>NSAutomaticDashSubstitutionEnabled</key>
+		<type>bool</type>
+		<value>false</value>
+		<comment>Disable smart dashes.</comment>
+	</preference>
+   <preference>
+		<class>user</class>
+		<domain>.GlobalPreferences</domain>
+		<key>NSAutomaticQuoteSubstitutionEnabled</key>
+		<type>bool</type>
+		<value>false</value>
+		<comment>Disable smart quotes.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.CrashReporter</domain>
+		<key>DialogType</key>
+		<type>string</type>
+		<value>none</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.desktopservices</domain>
+		<key>DSDontWriteNetworkStores</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.desktopservices</domain>
+		<key>DSDontWriteUSBStores</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>minimize-to-application</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>wvous-br-corner</key>
+		<type>int</type>
+		<value>6</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>wvous-br-modifier</key>
+		<type>int</type>
+		<value>0</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>wvous-bl-corner</key>
+		<type>int</type>
+		<value>5</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>wvous-bl-modifier</key>
+		<type>int</type>
+		<value>0</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>wvous-tr-corner</key>
+		<type>int</type>
+		<value>10</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.dock</domain>
+		<key>wvous-tr_modifier</key>
+		<type>int</type>
+		<value>0</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>_FXShowPosixPathInTitle</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>_FXSortFoldersFirst</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>FXDefaultSearchScope</key>
+		<type>string</type>
+		<value>SCcf</value>
+		<comment>Search current folder by default.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>FXPreferredSearchViewStyle</key>
+		<type>string</type>
+		<value>Nlsv</value>
+		<comment>Show file lists by default.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>FXPreferredViewStyle</key>
+		<type>string</type>
+		<value>Nlsv</value>
+		<comment>Show file lists by default.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>ShowPathBar</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>ShowStatusBar</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.finder</domain>
+		<key>NewWindowTarget</key>
+		<type>string</type>
+		<value>PfHm</value>
+		<comment>New window opens to user profile.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.loginwindow</domain>
+		<key>SHOWFULLNAME</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.loginwindow</domain>
+		<key>AdminHostInfo</key>
+		<type>string</type>
+		<value>DSStatus</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.loginwindow</domain>
+		<key>LoginwindowLaunchesRelaunchApps</key>
+		<type>bool</type>
+		<value>false</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.loginWindow</domain>
+		<key>TALLogoutSavesState</key>
+		<type>bool</type>
+		<value>false</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>ShowFullURLInSmartSearchField</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>ShowStatusBar</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>NewTabBehavior</key>
+		<type>int</type>
+		<value>1</value>
+		<comment>Open new browser tab with blank tab.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>NewWindowBehavior</key>
+		<type>int</type>
+		<value>1</value>
+		<comment>Open new browser window with blank tab.</comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>TabbedBrowsing</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>OpenExternalLinksInExistingWindow</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.Safari</domain>
+		<key>OpenNewTabsInFront</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.TimeMachine</domain>
+		<key>DoNotOfferNewDisksForBackup</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment></comment>
+	</preference>
+    <preference>
+		<class>user</class>
+		<domain>com.apple.universalaccess</domain>
+		<key>closeViewScrollWheelPreviousToggle</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment>Add Control-Zoom to accessibility.</comment>
+	</preference>	
+    <preference>
+		<class>user</class>
+		<domain>com.apple.universalaccess</domain>
+		<key>closeViewScrollWheelToggle</key>
+		<type>bool</type>
+		<value>true</value>
+		<comment>Add Control-Zoom to accessibility.</comment>
+	</preference>
+
 
 	<!--    start system class preferences    --> 
 
 
-	<preference>
+    <preference>
 		<class>system</class>
 		<domain>com.apple.loginwindow</domain>
 		<key>SHOWFULLNAME</key>
 		<type>bool</type>
 		<value>true</value>
-		<note>LoginWindow: FullName</note>
+		<comment></comment>
 	</preference>
-	<preference>
+    <preference>
 		<class>system</class>
 		<domain>com.apple.loginwindow</domain>
 		<key>AdminHostInfo</key>
 		<type>string</type>
 		<value>DSStatus</value>
-		<note>LoginWindow: Options</note>
+		<comment></comment>
 	</preference>
-	<preference>
+    <preference>
 		<class>system</class>
-		<domain>com.apple.NetworkAuthorization</domain>
+		<domain>com.apple.networkauthorization</domain>
 		<key>UseShortName</key>
 		<type>bool</type>
 		<value>true</value>
-		<note>NetAuth: ShortName</note>
+		<comment></comment>
 	</preference>
-	<preference>
-		<class>system</class>
-		<domain>com.apple.AppleMultitouchTrackpad</domain>
-		<key>Clicking</key>
+
+
+	<!--    start byhost class preferences    --> 
+
+    <preference>
+		<class>byhost</class>
+		<domain>.GlobalPreferences</domain>
+		<key>com.apple.mouse.tapBehavior</key>
 		<type>bool</type>
 		<value>true</value>
-		<note>Trackpad: TapToClick</note>
-	</preference>
-	<preference>
-		<class>system</class>
-		<domain>com.apple.AppleMultitouchTrackpad</domain>
-		<key>TrackpadRightClick</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>Trackpad: RightClick</note>
-	</preference>
-	<preference>
-		<class>system</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>Clicking</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>BTTrackpad: TapToClick</note>
-	</preference>
-	<preference>
-		<class>system</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>TrackpadRightClick</key>
-		<type>bool</type>
-		<value>true</value>
-		<note>BTTrackpad: RightClick</note>
-	</preference>
-	<preference>
-		<class>system</class>
-		<domain>com.apple.AppleBluetoothMultitouch.trackpad</domain>
-		<key>TrackpadScroll</key>
-		<type>bool</type>
-		<value>false</value>
-		<note>BTTrackpad: ReverseScroll</note>
+		<comment>Set tap to click for touchpads.</comment>
 	</preference>
 </preferences>
