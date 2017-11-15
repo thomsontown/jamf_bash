@@ -15,13 +15,6 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 
-#	verify run as root
-if [[ $EUID -ne 0 ]]; then
-	(>&2 echo "ERROR: This script must run with root privileges.")
-	exit $LINENO
-fi
-
-
 #	get list of home directories from target
 for USER_PLIST in "${TARGET%/}"/var/db/dslocal/nodes/Default/users/*.plist; do
 	HOME_DIRECTORIES+=(`/usr/bin/defaults read "$USER_PLIST" home | /usr/bin/awk -F'"' '{getline;print $2;exit}' 2> /dev/null`)
