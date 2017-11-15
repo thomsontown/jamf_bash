@@ -47,7 +47,15 @@ fi
 
 
 #	install script to local bin with short name -- optional
-if [ ! -x /usr/local/bin/quickdmg ]; then /usr/bin/install -o 0 -g 0 "$0" /usr/local/bin/quickdmg; fi
+if [ -x "/usr/local/bin/quickdmg" ]; then
+	SRCSUM=`/usr/bin/cksum "$0" | /usr/bin/awk '{print $1}'`
+	DSTSUM=`/usr/bin/cksum "/usr/local/bin/quickdmg" | /usr/bin/awk '{print $1}'`
+	if [ $SRCSUM != $DSTSUM ]; then
+		/usr/bin/install -v -m 0755 "$0" "/usr/local/bin/quickdmg"
+	fi
+else
+	/usr/bin/install -v -m 0755 "$0" "/usr/local/bin/quickdmg"
+fi
 
 
 #	get the path to the source app to package
@@ -97,6 +105,11 @@ fi
 
 #	make temp folder
 TMP_SOURCE=`/usr/bin/mktemp -d "/tmp/$NAME.XXXX"`
+if [ -z $TMP_SOURCE ]; then 
+	echo "ERROR: Unable to create temporary space for image."
+	exit $LINENO
+fi
+
 
 
 #	copy source to temp
@@ -119,8 +132,14 @@ echo Application Version:    $VERSION
 echo Temporary Source:       $TMP_SOURCE
 
 
+#	set ownership
+if ! /usr/sbin/chown -R 0:80 "${TMP_SOURCE%/}" 2> /dev/null; then
+	echo "ERROR: Unable to set ownership."
+	exit $LINENO
+fi
+
 #	set permissions
-if ! /bin/chmod -R 755 "${TMP_SOURCE%/}${SOURCE%/}" 2> /dev/null; then
+if ! /bin/chmod -R 755 "${TMP_SOURCE%/}" 2> /dev/null; then
 	echo "ERROR: Unable to set permissions."
 	exit $LINENO
 fi
