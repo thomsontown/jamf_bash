@@ -52,9 +52,11 @@ if [ -x "/usr/local/bin/quickdmg" ]; then
 	DSTSUM=`/usr/bin/cksum "/usr/local/bin/quickdmg" | /usr/bin/awk '{print $1}'`
 	if [ $SRCSUM != $DSTSUM ]; then
 		/usr/bin/install -v -m 0755 "$0" "/usr/local/bin/quickdmg"
+		/usr/bin/xattr -d com.apple.quarantine "/usr/local/bin/quickdmg"
 	fi
 else
 	/usr/bin/install -v -m 0755 "$0" "/usr/local/bin/quickdmg"
+	/usr/bin/xattr -d com.apple.quarantine "/usr/local/bin/quickdmg"
 fi
 
 
@@ -153,7 +155,7 @@ fi
 
 
 #	create disk image file
-if ! /usr/bin/hdiutil create -volname "$NAME" -srcfolder "${TMP_SOURCE%/}" -ov -format UDZO "${DMGPATH}${PREFIX}${NAME}${SUFFIX}${VERSION}.dmg" 2> /dev/null; then
+if ! /usr/bin/hdiutil create -fs HFS+ -volname "$NAME" -srcfolder "${TMP_SOURCE%/}" -ov -format UDZO "${DMGPATH}${PREFIX}${NAME}${SUFFIX}${VERSION}.dmg" 2> /dev/null; then
 	echo "ERROR: Unable to create disk image file."
 	exit $LINENO
 fi
