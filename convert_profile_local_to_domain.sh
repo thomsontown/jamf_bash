@@ -16,7 +16,7 @@
 
 
 #	variables
-DOMAIN_USERS="946772677"
+DOMAIN_USERS=""
 SCRIPT_TITLE="Convert Account"
 LOG_FILE=${0##*/}; LOG_FILE=${LOG_FILE%.*}.log
 
