@@ -107,7 +107,7 @@ fi
 
 #	make temp folder
 TMP_SOURCE=`/usr/bin/mktemp -d "/tmp/$NAME.XXXX"`
-if [ -z $TMP_SOURCE ]; then 
+if [ -z "$TMP_SOURCE" ]; then 
 	echo "ERROR: Unable to create temporary space for image."
 	exit $LINENO
 fi
