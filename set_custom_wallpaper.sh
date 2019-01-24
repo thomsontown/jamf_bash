@@ -136,7 +136,7 @@ function setWallpaper () {
 	#	rebuild cache (CoreStorage only)
 	if [ -f "/System/Library/Caches/com.apple.corestorage/EFILoginLocalizations" ]; then
 		/usr/bin/touch "/System/Library/Caches/com.apple.corestorage/EFILoginLocalizations"
-		/usr/sbin/kextcache -fu ${TARGET}
+		/usr/sbin/kextcache -fu /
 	fi
 
 	#	refresh dock
